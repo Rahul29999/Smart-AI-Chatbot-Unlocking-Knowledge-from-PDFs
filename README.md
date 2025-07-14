@@ -1,4 +1,4 @@
-# Smart AI Chatbot: Unlocking Knowledge from PDFs
+#  Smart AI Chatbot: Unlocking Knowledge from PDFs
 
 ## Project Overview
 This AI chatbot utilizes **Natural Language Processing (NLP)** and **Machine Learning** to extract information from a **PDF document** and answer user queries efficiently. It employs **FAISS (Facebook AI Similarity Search)** for embedding-based retrieval and provides a fallback response when the answer is not found in the PDF.
