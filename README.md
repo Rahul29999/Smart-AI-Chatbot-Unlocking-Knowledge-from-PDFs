@@ -1,56 +1,72 @@
-#  Smart AI Chatbot: Unlocking Knowledge from PDFs
+# 📚 Smart GenAI PDF Chatbot: Unlocking Knowledge from Documents
 
-## Project Overview
-This AI chatbot utilizes **Natural Language Processing (NLP)** and **Machine Learning** to extract information from a **PDF document** and answer user queries efficiently. It employs **FAISS (Facebook AI Similarity Search)** for embedding-based retrieval and provides a fallback response when the answer is not found in the PDF.
+## 🧠 Project Overview
 
-### Objective
-- Develop an AI chatbot that answers queries based on the content of a provided PDF.
-- Implement a fallback response for queries not covered by the document.
+This AI chatbot leverages **Natural Language Processing (NLP)** and **Machine Learning (ML)** to extract knowledge from **PDF documents** and answer user queries in natural language. It uses **FAISS (Facebook AI Similarity Search)** for fast embedding-based retrieval and integrates **Generative AI (GPT-3.5)** fallback when confidence is low — forming a **hybrid RAG system**.
 
-## Features
-- **PDF Text Extraction:** Extracts content from a PDF document.
-- **Text Preprocessing:** Cleans and tokenizes text for better query matching.
-- **ML-Based Search:** Uses `SentenceTransformers` for sentence embeddings, indexed with **FAISS**.
-- **Fallback Mechanism:** If a query isn’t matched, a predefined fallback message is displayed.
+---
 
-## How It Works
-1. **PDF Content Extraction** - Extracts text using `pdfplumber`.
-2. **Sentence Encoding** - Converts text into vector embeddings using `SentenceTransformers`.
-3. **Search Mechanism** - Matches user queries to embeddings in **FAISS**.
-4. **Fallback Logic** - Uses GPT as a backup if the confidence score is low.
-5. **User Interaction** - Runs interactively, providing answers from the PDF or fallback responses.
+### 🎯 Objectives
 
-## Installation
-```sh
-pip install pdfplumber faiss-cpu sentence-transformers
+* Build a **retrieval-augmented GenAI chatbot** that answers queries using content from PDF files.
+* Provide a **fallback response using GPT (or LLaMA)** when the PDF does not contain a high-confidence answer.
+
+---
+
+## ✨ Key Features
+
+* **PDF Text Extraction:** Uses `pdfplumber` to extract text from multi-page PDFs.
+* **Text Preprocessing:** Applies sentence tokenization with `spaCy` for clean sentence-level retrieval.
+* **Semantic Search Engine:** Encodes sentences using `SentenceTransformers` and indexes them using **FAISS**.
+* **Generative AI Fallback:** Uses **OpenAI GPT-3.5** to generate answers if query confidence is low.
+* **Interactive CLI Interface:** Allows users to chat in real-time.
+
+---
+
+## 🔄 How It Works
+
+1. **PDF Content Extraction** – Parses and extracts raw text using `pdfplumber`.
+2. **Sentence Splitting & Embedding** – Breaks text into sentences and encodes them using `all-MiniLM-L6-v2` from HuggingFace.
+3. **Semantic Indexing** – Indexes sentence embeddings with FAISS for fast nearest-neighbor search.
+4. **Query Matching** – Compares user query with indexed sentences. If confidence is low, a fallback LLM like **GPT** is triggered.
+5. **Response Generation** – Returns either the matched sentence or a GPT-generated response based on context.
+
+---
+
+## ⚙️ Installation
+
+```bash
+pip install pdfplumber faiss-cpu sentence-transformers openai spacy
+python -m spacy download en_core_web_sm
 ```
 
-## Implementation
-### Extract Text from PDF
+---
+
+## 💻 Code Snippets
+
+### 📄 PDF Text Extraction
+
 ```python
 import pdfplumber
 
 def extract_pdf_text(file_path):
     with pdfplumber.open(file_path) as pdf:
-        text = ''
-        for page in pdf.pages:
-            text += page.extract_text()
-    return text
+        return ' '.join(page.extract_text() or '' for page in pdf.pages)
 ```
 
-### Preprocess Text
+### 🧹 Text Preprocessing
+
 ```python
-import re
-import spacy
+import re, spacy
 
 def preprocess_text(text):
-    text = re.sub(r'\s+', ' ', text)
     nlp = spacy.load("en_core_web_sm")
-    doc = nlp(text)
-    return [sent.text.strip() for sent in doc.sents]
+    clean = re.sub(r'\s+', ' ', text)
+    return [sent.text.strip() for sent in nlp(clean).sents]
 ```
 
-### Generate Sentence Embeddings
+### 🔢 Sentence Embedding
+
 ```python
 from sentence_transformers import SentenceTransformer
 
@@ -58,53 +74,99 @@ model = SentenceTransformer('all-MiniLM-L6-v2')
 embeddings = model.encode(sentences, convert_to_tensor=True)
 ```
 
-### Create FAISS Index
-```python
-import faiss
-import numpy as np
+### 🔍 FAISS Index Creation
 
-embeddings_np = np.array([emb.numpy() for emb in embeddings])
+```python
+import faiss, numpy as np
+
+embeddings_np = np.array([e.numpy() for e in embeddings])
 index = faiss.IndexFlatL2(embeddings_np.shape[1])
 index.add(embeddings_np)
 ```
 
-### Query Function
+### 🤖 GPT Fallback Logic
+
 ```python
-def search_query(query, sentences, index, model, threshold=0.5):
-    query_embedding = model.encode([query], convert_to_tensor=True).numpy()
-    distances, indices = index.search(query_embedding, k=1)
-    if distances[0][0] > threshold:
-        return "Sorry, I didn’t understand your question. Do you want to connect with a live agent?"
-    return sentences[indices[0][0]]
+import openai
+
+openai.api_key = "your-openai-api-key"
+
+def gpt_fallback(query, context):
+    prompt = f"Answer this based on the document:\n\n{context}\n\nQuestion: {query}"
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=150
+    )
+    return response.choices[0].message.content.strip()
 ```
 
-### Chatbot Interaction
+### ❓ Query Handler
+
 ```python
-while True:
-    user_query = input("Ask a question (or type 'exit' to quit): ")
-    if user_query.lower() == 'exit':
-        print("Goodbye!")
-        break
-    response = search_query(user_query, sentences, index, model)
-    print(f"Response: {response}")
+def search_query(query, sentences, index, model, embeddings, threshold=0.8):
+    query_vector = model.encode([query], convert_to_tensor=True).numpy()
+    distances, indices = index.search(query_vector, k=1)
+    if distances[0][0] < threshold:
+        return sentences[indices[0][0]], False
+    else:
+        context = " ".join(sentences[:20])
+        return gpt_fallback(query, context), True
 ```
 
-## Example Queries
-- **Input:** "What is the Term End Examination policy?"
-  - **Output:** "Term End Examination Credence is 70%."
-- **Input:** "Tell me about AI."
-  - **Output:** "Sorry, I didn’t understand your question. Do you want to connect with a live agent?"
+### 💬 Chat Loop
 
-## Usage Instructions
-1. Upload a **PDF document** in Google Colab.
-2. Run the provided Python scripts step by step.
-3. Start the chatbot and ask questions interactively.
+```python
+def chatbot(file_path):
+    text = extract_pdf_text(file_path)
+    sentences = preprocess_text(text)
+    sentence_embeddings = model.encode(sentences, convert_to_tensor=True)
+    index = build_faiss_index(np.array([e.numpy() for e in sentence_embeddings]))
+    
+    while True:
+        query = input("You: ")
+        if query.lower() == 'exit':
+            break
+        answer, is_gen = search_query(query, sentences, index, model, sentence_embeddings)
+        print(f"{'GPT' if is_gen else 'PDF'}: {answer}\n")
+```
 
-## Potential Enhancements
-- **GPT Integration:** Add GPT fallback for better responses.
-- **Web UI:** Use **Streamlit** or **Gradio** for a user-friendly interface.
-- **Multi-PDF Support:** Extend functionality to process multiple PDFs.
+---
 
-## Conclusion
-This AI chatbot provides an **efficient** and **scalable** solution for retrieving answers from PDFs using **Machine Learning** and **Natural Language Processing (NLP)**. It can be used for **education, customer support, and research applications**.
+## 💡 Example Queries
+
+| User Query                                 | Response Source     |
+| ------------------------------------------ | ------------------- |
+| "What is the Term End Examination policy?" | 📄 Matched from PDF |
+| "Tell me about Artificial Intelligence."   | 🤖 GPT-3.5 fallback |
+
+---
+
+## 📌 Usage Instructions
+
+1. Upload a PDF document (`your_pdf_file.pdf`) in the working directory.
+2. Replace your OpenAI API key in the script.
+3. Run the script in your terminal or Google Colab.
+4. Ask natural questions — the bot will answer from PDF or fallback to GPT if needed.
+
+---
+
+## 🚀 Potential Enhancements
+
+* Add **Streamlit or Gradio UI** for a web-based chatbot.
+* Support **multiple PDFs** for document-level Q\&A.
+* Use **local LLMs like LLaMA or Mistral** instead of GPT-3.5 for open-source deployment.
+* Add **context window sliding** for large document understanding.
+
+---
+
+## ✅ Conclusion
+
+This project demonstrates a **fully functional Generative AI-powered document chatbot**, combining **NLP**, **semantic search**, and **LLM generation**. It's ideal for use cases like:
+
+* 📚 Education & Online Courses
+* 🧾 Customer Support over PDFs
+* 🧠 Knowledge Retrieval from Manuals, Policies, and Docs
+
+
 
