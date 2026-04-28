@@ -1,172 +1,279 @@
-# 📚 Smart GenAI PDF Chatbot: Unlocking Knowledge from Documents
+# Smart GenAI PDF Chatbot: Unlocking Knowledge from Documents
 
-##  Project Overview
-
-This AI chatbot leverages **Natural Language Processing (NLP)** and **Machine Learning (ML)** to extract knowledge from **PDF documents** and answer user queries in natural language. It uses **FAISS (Facebook AI Similarity Search)** for fast embedding-based retrieval and integrates **Generative AI (GPT-3.5)** fallback when confidence is low — forming a **hybrid RAG system**.
-
----
-
-###  Objectives
-
-* Build a **retrieval-augmented GenAI chatbot** that answers queries using content from PDF files.
-* Provide a **fallback response using GPT (or LLaMA)** when the PDF does not contain a high-confidence answer.
+![Python](https://img.shields.io/badge/Python-3.10-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.104-green)
+![LangChain](https://img.shields.io/badge/LangChain-1.2-orange)
+![FAISS](https://img.shields.io/badge/FAISS-Vector_Search-red)
+![Docker](https://img.shields.io/badge/Docker-Ready-blue)
 
 ---
 
-##  Key Features
+## Project Overview
 
-* **PDF Text Extraction:** Uses `pdfplumber` to extract text from multi-page PDFs.
-* **Text Preprocessing:** Applies sentence tokenization with `spaCy` for clean sentence-level retrieval.
-* **Semantic Search Engine:** Encodes sentences using `SentenceTransformers` and indexes them using **FAISS**.
-* **Generative AI Fallback:** Uses **OpenAI GPT-3.5** to generate answers if query confidence is low.
-* **Interactive CLI Interface:** Allows users to chat in real-time.
+This is an end-to-end production-ready AI chatbot that extracts knowledge from PDF documents and answers user queries using a Retrieval-Augmented Generation (RAG) pipeline.
+
+The system combines FAISS-based semantic search, LangChain prompt orchestration, and GPT-3.5 to deliver accurate, context-aware answers — with a structured FastAPI backend, A/B prompt testing, and real-time monitoring.
 
 ---
 
-##  How It Works
+## Architecture
 
-1. **PDF Content Extraction** – Parses and extracts raw text using `pdfplumber`.
-2. **Sentence Splitting & Embedding** – Breaks text into sentences and encodes them using `all-MiniLM-L6-v2` from HuggingFace.
-3. **Semantic Indexing** – Indexes sentence embeddings with FAISS for fast nearest-neighbor search.
-4. **Query Matching** – Compares user query with indexed sentences. If confidence is low, a fallback LLM like **GPT** is triggered.
-5. **Response Generation** – Returns either the matched sentence or a GPT-generated response based on context.
+```
+PDF Input
+    |
+PDF Text Extraction (pdfplumber)
+    |
+Sentence Preprocessing (spaCy)
+    |
+Embedding Generation (Sentence Transformers - all-MiniLM-L6-v2)
+    |
+FAISS Vector Index
+    |
+Query -> Semantic Search
+    |-- High Confidence --> PDF Answer
+    |-- Low Confidence --> LangChain + GPT-3.5 Fallback
+                                |
+                    FastAPI Response + Monitoring Log
+```
 
 ---
 
-## ⚙ Installation
+## Key Features
+
+- RAG Pipeline: Retrieval-Augmented Generation — answers from PDF first, GPT fallback when confidence is low
+- FAISS Vector Search: Fast semantic nearest-neighbor search on sentence embeddings
+- LangChain Integration: Prompt templates and LLMChain orchestration
+- FastAPI Backend: Production-ready REST API with /upload, /ask, /health, /stats endpoints
+- A/B Prompt Testing: Compare two prompt strategies to measure which gives better answers
+- Monitoring and Logging: Query logs, source tracking, latency tracking per request
+- Evaluation Framework: Routing accuracy metrics — PDF vs GPT source evaluation
+- Docker Ready: Fully containerized for deployment
+
+---
+
+## Project Structure
+
+```
+Smart-AI-Chatbot/
+|-- Ai_Chatbot.ipynb        # Original experimental notebook
+|-- chatbot.py              # Core RAG pipeline (extract, embed, search)
+|-- langchain_pipeline.py   # LangChain prompt template + LLMChain
+|-- app.py                  # FastAPI server (upload, ask, stats endpoints)
+|-- ab_test.py              # A/B testing for prompt comparison
+|-- evaluate.py             # Evaluation framework + routing accuracy
+|-- monitoring.py           # Query logging + latency tracking
+|-- requirements.txt        # Dependencies
+|-- Dockerfile              # Container deployment
+|-- README.md
+```
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Language | Python 3.10 |
+| LLM | OpenAI GPT-3.5-turbo |
+| Embeddings | Sentence Transformers (all-MiniLM-L6-v2) |
+| Vector Search | FAISS (IndexFlatL2) |
+| LLM Orchestration | LangChain + LangChain-OpenAI |
+| API Framework | FastAPI + Uvicorn |
+| PDF Extraction | pdfplumber |
+| NLP Preprocessing | spaCy (en_core_web_sm) |
+| Containerization | Docker |
+| Monitoring | Custom JSON logging |
+
+---
+
+## Installation and Setup
+
+### 1. Clone the repository
 
 ```bash
-pip install pdfplumber faiss-cpu sentence-transformers openai spacy
+git clone https://github.com/Rahul29999/Smart-AI-Chatbot-Unlocking-Knowledge-from-PDFs.git
+cd Smart-AI-Chatbot-Unlocking-Knowledge-from-PDFs
+```
+
+### 2. Install dependencies
+
+```bash
+pip install -r requirements.txt
 python -m spacy download en_core_web_sm
 ```
 
----
+### 3. Set your OpenAI API key
 
-##  Code Snippets
-
-### 📄 PDF Text Extraction
+In chatbot.py, langchain_pipeline.py, and ab_test.py:
 
 ```python
-import pdfplumber
-
-def extract_pdf_text(file_path):
-    with pdfplumber.open(file_path) as pdf:
-        return ' '.join(page.extract_text() or '' for page in pdf.pages)
+openai.api_key = 'your-api-key-here'
 ```
 
-###  Text Preprocessing
+### 4. Run the API
 
-```python
-import re, spacy
-
-def preprocess_text(text):
-    nlp = spacy.load("en_core_web_sm")
-    clean = re.sub(r'\s+', ' ', text)
-    return [sent.text.strip() for sent in nlp(clean).sents]
+```bash
+uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
-###  Sentence Embedding
+### 5. Run with Docker
 
-```python
-from sentence_transformers import SentenceTransformer
-
-model = SentenceTransformer('all-MiniLM-L6-v2')
-embeddings = model.encode(sentences, convert_to_tensor=True)
-```
-
-###  FAISS Index Creation
-
-```python
-import faiss, numpy as np
-
-embeddings_np = np.array([e.numpy() for e in embeddings])
-index = faiss.IndexFlatL2(embeddings_np.shape[1])
-index.add(embeddings_np)
-```
-
-###  GPT Fallback Logic
-
-```python
-import openai
-
-openai.api_key = "your-openai-api-key"
-
-def gpt_fallback(query, context):
-    prompt = f"Answer this based on the document:\n\n{context}\n\nQuestion: {query}"
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=150
-    )
-    return response.choices[0].message.content.strip()
-```
-
-### Query Handler
-
-```python
-def search_query(query, sentences, index, model, embeddings, threshold=0.8):
-    query_vector = model.encode([query], convert_to_tensor=True).numpy()
-    distances, indices = index.search(query_vector, k=1)
-    if distances[0][0] < threshold:
-        return sentences[indices[0][0]], False
-    else:
-        context = " ".join(sentences[:20])
-        return gpt_fallback(query, context), True
-```
-
-###  Chat Loop
-
-```python
-def chatbot(file_path):
-    text = extract_pdf_text(file_path)
-    sentences = preprocess_text(text)
-    sentence_embeddings = model.encode(sentences, convert_to_tensor=True)
-    index = build_faiss_index(np.array([e.numpy() for e in sentence_embeddings]))
-    
-    while True:
-        query = input("You: ")
-        if query.lower() == 'exit':
-            break
-        answer, is_gen = search_query(query, sentences, index, model, sentence_embeddings)
-        print(f"{'GPT' if is_gen else 'PDF'}: {answer}\n")
+```bash
+docker build -t pdf-chatbot .
+docker run -p 8000:8000 pdf-chatbot
 ```
 
 ---
 
-##  Example Queries
+## API Endpoints
 
-| User Query                                 | Response Source     |
-| ------------------------------------------ | ------------------- |
-| "What is the Term End Examination policy?" |  Matched from PDF |
-| "Tell me about Artificial Intelligence."   |  GPT-3.5 fallback |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | /health | Check API status and PDF load status |
+| POST | /upload | Upload a PDF — extracts and indexes content |
+| POST | /ask | Ask a question — returns answer, source, and latency |
+| GET | /stats | Query stats — total, pdf answered, gpt answered, avg latency |
+
+### Upload PDF
+
+```bash
+curl -X POST "http://localhost:8000/upload" \
+  -F "file=@your_document.pdf"
+```
+
+Response:
+```json
+{
+  "message": "PDF uploaded and indexed",
+  "sentences_indexed": 923
+}
+```
+
+### Ask a Question
+
+```bash
+curl -X POST "http://localhost:8000/ask" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What is SQL?", "threshold": 0.8}'
+```
+
+Response:
+```json
+{
+  "query": "What is SQL?",
+  "answer": "SQL is a structured query language used to manage relational databases.",
+  "source": "pdf",
+  "latency_ms": 22.97
+}
+```
+
+### Get Stats
+
+```bash
+curl http://localhost:8000/stats
+```
+
+Response:
+```json
+{
+  "total_queries": 10,
+  "pdf_answered": 8,
+  "gpt_answered": 2,
+  "avg_latency_ms": 23.74
+}
+```
 
 ---
 
-##  Usage Instructions
+## Evaluation
 
-1. Upload a PDF document (`your_pdf_file.pdf`) in the working directory.
-2. Replace your OpenAI API key in the script.
-3. Run the script in your terminal or Google Colab.
-4. Ask natural questions — the bot will answer from PDF or fallback to GPT if needed.
+Run the evaluation script to measure routing accuracy:
+
+```bash
+python evaluate.py
+```
+
+Output:
+```
+Query                                         Expected   Got        Result
+------------------------------------------------------------------------
+What is this document about?                  pdf        pdf        PASS
+Explain quantum computing in detail           gpt        gpt        PASS
+What are the main topics covered?             pdf        pdf        PASS
+Tell me about artificial intelligence         gpt        gpt        PASS
+
+Routing Accuracy: 100.0% (4/4)
+```
 
 ---
 
-##  Potential Enhancements
+## A/B Prompt Testing
 
-* Add **Streamlit or Gradio UI** for a web-based chatbot.
-* Support **multiple PDFs** for document-level Q\&A.
-* Use **local LLMs like LLaMA or Mistral** instead of GPT-3.5 for open-source deployment.
-* Add **context window sliding** for large document understanding.
+Compare two different prompt strategies:
+
+```bash
+python ab_test.py
+```
+
+Tests Prompt A (strict document assistant) vs Prompt B (friendly tutor style) to identify which prompt yields better, more accurate answers for a given document.
 
 ---
 
-##  Conclusion
+## Monitoring
 
-This project demonstrates a **fully functional Generative AI-powered document chatbot**, combining **NLP**, **semantic search**, and **LLM generation**. It's ideal for use cases like:
+Every query is automatically logged to query_logs.json:
 
-*  Education & Online Courses
-*  Customer Support over PDFs
-*  Knowledge Retrieval from Manuals, Policies, and Docs
+```json
+{
+  "timestamp": "2025-04-27T11:06:00",
+  "query": "What is SQL?",
+  "answer": "SQL is a structured query language...",
+  "source": "pdf",
+  "latency_ms": 22.97
+}
+```
 
+---
 
+## Key Technical Decisions
 
+### RAG over Fine-tuning
+
+Deliberately chose RAG instead of fine-tuning for this use case. RAG retrieves answers directly from the PDF source, making responses accurate and traceable back to the document. Fine-tuning would risk hallucination and lose source grounding — which matters a lot when the document is the source of truth.
+
+### FAISS over ChromaDB
+
+FAISS is lightweight, fast, and requires no additional server setup — ideal for document-scale retrieval. ChromaDB adds unnecessary infrastructure complexity for this use case.
+
+### LangChain for Prompt Orchestration
+
+Used LangChain's PromptTemplate and LLMChain for structured, reusable prompt management — following production best practices over raw string formatting.
+
+---
+
+## Future Enhancements
+
+- Streamlit or Gradio web UI for non-technical users
+- Support for multiple PDFs simultaneously
+- Local LLM support (LLaMA or Mistral) to remove API cost dependency
+- Context window sliding for large document understanding
+- GitHub Actions CI/CD pipeline
+- Cloud deployment on AWS or GCP
+
+---
+
+## Use Cases
+
+- Education: students querying textbooks and study material
+- Enterprise: employees querying internal policy documents
+- Legal: lawyers querying case files and contracts
+- Technical: engineers querying manuals and documentation
+
+---
+
+## Author
+
+Rahul Kumar Sharma
+
+- GitHub: https://github.com/Rahul29999
+- LinkedIn: https://linkedin.com/in/rahul-kumar-sharma-aa0b57233
